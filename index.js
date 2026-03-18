@@ -5,7 +5,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const WEBHOOK = process.env.B24_WEBHOOK || 'https://realpay.bitrix24.ru/rest/1/nvxswslx4p6q9bgg';
+const WEBHOOK = (process.env.B24_WEBHOOK || 'https://realpay.bitrix24.ru/rest/1/ijt2of2kuhcz7pnj').replace(/\/$/, '');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
