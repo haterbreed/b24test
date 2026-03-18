@@ -48,18 +48,14 @@ app.get('/api/summary', async (req, res) => {
 
     // Stage labels
     const stages = {};
-try {
- const stages = {};
-try {
-  const stagesRes = await axios.get(`${WEBHOOK}/crm.status.list`, {
-    params: { filter: { ENTITY_ID: 'DEAL_STAGE' } }
-  });
-  (stagesRes.data.result || []).forEach(s => {
-    stages[s.STATUS_ID] = s.NAME;
-  });
-} catch(e) {}
-  });
-} catch(e) {}
+    try {
+      const stagesRes = await axios.get(`${WEBHOOK}/crm.status.list`, {
+        params: { filter: { ENTITY_ID: 'DEAL_STAGE' } }
+      });
+      (stagesRes.data.result || []).forEach(s => {
+        stages[s.STATUS_ID] = s.NAME;
+      });
+    } catch(e) { console.error('stages error', e.message); }
 
     // Deals by stage
     const byStage = {};
@@ -127,9 +123,15 @@ app.get('/api/deals', async (req, res) => {
       order: { DATE_CREATE: 'DESC' }
     });
 
-    const stagesRes = await axios.get(`${WEBHOOK}/crm.dealcategory.stages`, { params: { id: 0 } });
     const stages = {};
-    (stagesRes.data.result || []).forEach(s => { stages[s.STATUS_ID] = s.NAME; });
+    try {
+      const stagesRes = await axios.get(`${WEBHOOK}/crm.status.list`, {
+        params: { filter: { ENTITY_ID: 'DEAL_STAGE' } }
+      });
+      (stagesRes.data.result || []).forEach(s => {
+        stages[s.STATUS_ID] = s.NAME;
+      });
+    } catch(e) { console.error('stages error', e.message); }
 
     let result = deals.map(d => ({
       id: d.ID,
