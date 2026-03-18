@@ -47,13 +47,15 @@ app.get('/api/summary', async (req, res) => {
     ]);
 
     // Stage labels
-    const stagesRes = await axios.get(`${WEBHOOK}/crm.dealcategory.stages`, {
-      params: { id: 0 }
-    });
     const stages = {};
-    (stagesRes.data.result || []).forEach(s => {
-      stages[s.STATUS_ID] = s.NAME;
-    });
+try {
+  const stagesRes = await axios.get(`${WEBHOOK}/crm.status.list`, {
+    params: { filter: { ENTITY_ID: 'DEAL_STAGE' } }
+  });
+  (stagesRes.data.result || []).forEach(s => {
+    stages[s.STATUS_ID] = s.NAME;
+  });
+} catch(e) {}
 
     // Deals by stage
     const byStage = {};
