@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RealPay · CRM Дашборд</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Geologica:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --bg2: #111318;
+    --bg3: #181c24;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --accent: #00e5a0;
+    --accent2: #00b8ff;
+    --accent3: #ff6b6b;
+    --accent4: #ffd166;
+    --text: #f0f2f5;
+    --text2: #8a909c;
+    --text3: #555c6b;
+    --won: #00e5a0;
+    --active: #00b8ff;
+    --lost: #ff6b6b;
+    --font-display: 'Unbounded', sans-serif;
+    --font-body: 'Geologica', sans-serif;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow orb */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 400px;
+    background: radial-gradient(ellipse, rgba(0,229,160,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Layout */
+  .shell { position: relative; z-index: 1; display: flex; height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 28px 0;
+  }
+
+  .logo {
+    padding: 0 24px 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .logo-name {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.3px;
+  }
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .nav { flex: 1; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 24px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 400;
+    font-size: 13.5px;
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-item.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(0,229,160,0.05);
+  }
+  .nav-icon { width: 18px; height: 18px; opacity: 0.7; }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  .sidebar-footer {
+    padding: 20px 24px 0;
+    border-top: 1px solid var(--border);
+  }
+  .sync-btn {
+    width: 100%;
+    padding: 9px;
+    background: rgba(0,229,160,0.08);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+  .sync-btn:hover { background: rgba(0,229,160,0.14); }
+  .sync-btn.loading { opacity: 0.6; pointer-events: none; }
+
+  /* Main */
+  .main { flex: 1; overflow-y: auto; padding: 36px 36px 36px; }
+
+  /* Page header */
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .page-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .status-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 6px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,229,160,0.4); }
+    50% { opacity: 0.8; box-shadow: 0 0 0 5px rgba(0,229,160,0); }
+  }
+
+  /* Page views */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* KPI grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .kpi-card:hover { border-color: var(--border2); }
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .kpi-card.green::after { background: var(--won); }
+  .kpi-card.blue::after { background: var(--active); }
+  .kpi-card.red::after { background: var(--lost); }
+  .kpi-card.neutral::after { background: var(--text3); }
+
+  .kpi-label {
+    font-size: 11.5px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+  }
+  .kpi-value {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .kpi-card.green .kpi-value { color: var(--won); }
+  .kpi-card.blue .kpi-value { color: var(--active); }
+  .kpi-card.red .kpi-value { color: var(--lost); }
+  .kpi-sub { font-size: 12px; color: var(--text3); margin-top: 6px; }
+
+  /* Charts row */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .chart-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .chart-wrap { position: relative; }
+
+  /* Table card */
+  .table-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .table-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .table-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+  }
+  .search-input {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+    width: 220px;
+    transition: border-color 0.15s;
+  }
+  .search-input::placeholder { color: var(--text3); }
+  .search-input:focus { border-color: var(--accent); }
+
+  .stage-select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .stage-select option { background: var(--bg3); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    padding: 10px 20px;
+    text-align: left;
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    background: var(--bg3);
+    font-weight: 500;
+  }
+  tbody tr {
+    border-top: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  tbody td { padding: 13px 20px; font-size: 13.5px; color: var(--text); }
+  td.muted { color: var(--text2); }
+  td.amount { font-family: var(--font-display); font-size: 13px; font-weight: 600; }
+
+  .stage-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .stage-WON    { background: rgba(0,229,160,0.12); color: var(--won); }
+  .stage-LOSE   { background: rgba(255,107,107,0.12); color: var(--lost); }
+  .stage-other  { background: rgba(0,184,255,0.1); color: var(--active); }
+
+  /* Loading */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    gap: 16px;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: var(--text2); font-size: 14px; }
+
+  /* Skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, var(--bg3) 25%, var(--bg2) 50%, var(--bg3) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: 6px;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* Stagger fade-in */
+  .fade-in { animation: fadeIn 0.4s ease both; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: none; } }
+  .delay-1 { animation-delay: 0.05s; }
+  .delay-2 { animation-delay: 0.1s; }
+  .delay-3 { animation-delay: 0.15s; }
+  .delay-4 { animation-delay: 0.2s; }
+  .delay-5 { animation-delay: 0.25s; }
+  .delay-6 { animation-delay: 0.3s; }
+
+  /* Error */
+  .error-box {
+    background: rgba(255,107,107,0.08);
+    border: 1px solid rgba(255,107,107,0.2);
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    color: var(--lost);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text2);
+  }
+  .page-btns { display: flex; gap: 6px; }
+  .page-btn {
+    padding: 5px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 12px;
+    transition: all 0.1s;
+  }
+  .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .page-btn.active { background: rgba(0,229,160,0.1); border-color: var(--accent); color: var(--accent); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-name">RealPay</div>
+      <div class="logo-sub">CRM Dashboard</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard', this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Дашборд
+      </div>
+      <div class="nav-item" data-page="deals" onclick="showPage('deals', this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+        Сделки
+      </div>
+      <div class="nav-item" data-page="contacts" onclick="showPage('contacts', this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Контакты
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="sync-btn" id="syncBtn" onclick="syncAll()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Обновить данные
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- Dashboard page -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Обзор</div>
+          <div class="page-sub"><span class="status-dot"></span>Данные из Битрикс24</div>
+        </div>
+      </div>
+      <div id="dashboard-content">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-text">Загружаю данные из Битрикс24…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deals page -->
+    <div class="page" id="page-deals">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Сделки</div>
+          <div class="page-sub">Все сделки CRM</div>
+        </div>
+      </div>
+      <div id="deals-content">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-text">Загружаю сделки…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contacts page -->
+    <div class="page" id="page-contacts">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Контакты</div>
+          <div class="page-sub">Клиенты и контакты CRM</div>
+        </div>
+      </div>
+      <div id="contacts-content">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <div class="loading-text">Загружаю контакты…</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let summaryData = null;
+let allDeals = [];
+let allContacts = [];
+let dealsPage = 1;
+const PAGE_SIZE = 25;
+let chartBar = null, chartDoughnut = null;
+let dealsSearch = '', dealsStageFilter = 'all';
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'dashboard' && !summaryData) loadDashboard();
+  if (name === 'deals' && allDeals.length === 0) loadDeals();
+  if (name === 'contacts' && allContacts.length === 0) loadContacts();
+}
+
+function syncAll() {
+  summaryData = null; allDeals = []; allContacts = [];
+  const btn = document.getElementById('syncBtn');
+  btn.classList.add('loading');
+  btn.textContent = 'Обновляю…';
+  const activePage = document.querySelector('.nav-item.active')?.dataset.page || 'dashboard';
+  if (activePage === 'dashboard') loadDashboard();
+  if (activePage === 'deals') loadDeals();
+  if (activePage === 'contacts') loadContacts();
+  setTimeout(() => {
+    btn.classList.remove('loading');
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Обновить данные`;
+  }, 3000);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + ' млн ₽';
+  if (n >= 1e3) return (n / 1e3).toFixed(0) + ' тыс ₽';
+  return n.toLocaleString('ru') + ' ₽';
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleDateString('ru', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function stageBadge(stageId, stageName) {
+  const cls = stageId === 'WON' ? 'stage-WON' : stageId === 'LOSE' ? 'stage-LOSE' : 'stage-other';
+  return `<span class="stage-badge ${cls}">${stageName || stageId}</span>`;
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  document.getElementById('dashboard-content').innerHTML = `
+    <div class="loading-state"><div class="spinner"></div><div class="loading-text">Загружаю данные из Битрикс24…</div></div>`;
+  try {
+    const res = await fetch('/api/summary');
+    if (!res.ok) throw new Error('Ошибка сервера ' + res.status);
+    summaryData = await res.json();
+    if (summaryData.error) throw new Error(summaryData.error);
+    renderDashboard(summaryData);
+  } catch (e) {
+    document.getElementById('dashboard-content').innerHTML =
+      `<div class="error-box">Ошибка загрузки: ${e.message}</div>`;
+  }
+}
+
+function renderDashboard(d) {
+  const { totals, byStage, byMonth, recentDeals } = d;
+
+  // Prepare monthly chart data (last 8 months)
+  const months = Object.keys(byMonth).sort().slice(-8);
+  const monthLabels = months.map(m => {
+    const [y, mo] = m.split('-');
+    return new Date(y, mo - 1).toLocaleDateString('ru', { month: 'short', year: '2-digit' });
+  });
+  const monthCounts = months.map(m => byMonth[m].count);
+
+  // Stage chart
+  const stageLabels = Object.keys(byStage);
+  const stageCounts = stageLabels.map(k => byStage[k]);
+
+  document.getElementById('dashboard-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card green fade-in delay-1">
+        <div class="kpi-label">Выиграно</div>
+        <div class="kpi-value">${fmt(totals.totalWon)}</div>
+        <div class="kpi-sub">${totals.deals} сделок всего</div>
+      </div>
+      <div class="kpi-card blue fade-in delay-2">
+        <div class="kpi-label">В работе</div>
+        <div class="kpi-value">${fmt(totals.totalActive)}</div>
+        <div class="kpi-sub">Активные сделки</div>
+      </div>
+      <div class="kpi-card red fade-in delay-3">
+        <div class="kpi-label">Проиграно</div>
+        <div class="kpi-value">${fmt(totals.totalLost)}</div>
+        <div class="kpi-sub">Закрытые без продажи</div>
+      </div>
+      <div class="kpi-card neutral fade-in delay-4">
+        <div class="kpi-label">Сделок</div>
+        <div class="kpi-value" style="color:var(--text)">${totals.deals}</div>
+        <div class="kpi-sub">Всего в CRM</div>
+      </div>
+      <div class="kpi-card neutral fade-in delay-5">
+        <div class="kpi-label">Контактов</div>
+        <div class="kpi-value" style="color:var(--text)">${totals.contacts}</div>
+        <div class="kpi-sub">Физические лица</div>
+      </div>
+      <div class="kpi-card neutral fade-in delay-6">
+        <div class="kpi-label">Компаний</div>
+        <div class="kpi-value" style="color:var(--text)">${totals.companies}</div>
+        <div class="kpi-sub">Организации</div>
+      </div>
+    </div>
+
+    <div class="charts-row fade-in delay-2">
+      <div class="chart-card">
+        <div class="chart-title">Сделки по месяцам</div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="chartBar"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">По стадиям</div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="chartDoughnut"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card fade-in delay-3">
+      <div class="table-header">
+        <div class="table-title">Последние сделки</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Название</th>
+          <th>Стадия</th>
+          <th>Сумма</th>
+          <th>Дата</th>
+        </tr></thead>
+        <tbody>
+          ${recentDeals.map(d => `
+            <tr>
+              <td>${d.title || '—'}</td>
+              <td>${stageBadge(d.stageId, d.stage)}</td>
+              <td class="amount">${d.amount ? fmt(d.amount) : '—'}</td>
+              <td class="muted">${fmtDate(d.date)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // Render charts
+  const cfgBase = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } }
+  };
+
+  if (chartBar) chartBar.destroy();
+  chartBar = new Chart(document.getElementById('chartBar'), {
+    type: 'bar',
+    data: {
+      labels: monthLabels,
+      datasets: [{
+        data: monthCounts,
+        backgroundColor: 'rgba(0,229,160,0.25)',
+        borderColor: 'rgba(0,229,160,0.8)',
+        borderWidth: 1.5,
+        borderRadius: 6,
+        hoverBackgroundColor: 'rgba(0,229,160,0.4)'
+      }]
+    },
+    options: {
+      ...cfgBase,
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a909c', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a909c', font: { size: 11 } } }
+      }
+    }
+  });
+
+  if (chartDoughnut) chartDoughnut.destroy();
+  const palette = ['#00e5a0','#00b8ff','#ffd166','#ff6b6b','#a78bfa','#fb923c','#34d399','#60a5fa'];
+  chartDoughnut = new Chart(document.getElementById('chartDoughnut'), {
+    type: 'doughnut',
+    data: {
+      labels: stageLabels,
+      datasets: [{
+        data: stageCounts,
+        backgroundColor: stageLabels.map((_, i) => palette[i % palette.length] + '55'),
+        borderColor: stageLabels.map((_, i) => palette[i % palette.length]),
+        borderWidth: 1.5,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      ...cfgBase,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          display: true,
+          position: 'right',
+          labels: { color: '#8a909c', font: { size: 11 }, boxWidth: 12, padding: 10 }
+        }
+      }
+    }
+  });
+}
+
+// ── Deals ────────────────────────────────────────────────────────────────────
+async function loadDeals() {
+  document.getElementById('deals-content').innerHTML = `
+    <div class="loading-state"><div class="spinner"></div><div class="loading-text">Загружаю сделки…</div></div>`;
+  try {
+    const res = await fetch('/api/deals');
+    allDeals = await res.json();
+    if (allDeals.error) throw new Error(allDeals.error);
+    dealsPage = 1;
+    renderDeals();
+  } catch (e) {
+    document.getElementById('deals-content').innerHTML =
+      `<div class="error-box">Ошибка: ${e.message}</div>`;
+  }
+}
+
+function renderDeals() {
+  let filtered = allDeals;
+  if (dealsSearch) {
+    const q = dealsSearch.toLowerCase();
+    filtered = filtered.filter(d => d.title.toLowerCase().includes(q));
+  }
+  if (dealsStageFilter !== 'all') {
+    filtered = filtered.filter(d => d.stageId === dealsStageFilter);
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (dealsPage > totalPages) dealsPage = totalPages;
+  const slice = filtered.slice((dealsPage - 1) * PAGE_SIZE, dealsPage * PAGE_SIZE);
+
+  // Unique stages for filter
+  const stages = [...new Map(allDeals.map(d => [d.stageId, d.stage])).entries()];
+
+  document.getElementById('deals-content').innerHTML = `
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Сделки (${total})</div>
+        <select class="stage-select" onchange="setStageFilter(this.value)">
+          <option value="all">Все стадии</option>
+          ${stages.map(([id, name]) =>
+            `<option value="${id}" ${dealsStageFilter === id ? 'selected' : ''}>${name}</option>`
+          ).join('')}
+        </select>
+        <input class="search-input" placeholder="Поиск по названию…"
+          value="${dealsSearch}"
+          oninput="setDealsSearch(this.value)">
+      </div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Название</th><th>Стадия</th><th>Сумма</th><th>Дата</th>
+        </tr></thead>
+        <tbody>
+          ${slice.map(d => `
+            <tr>
+              <td class="muted">${d.id}</td>
+              <td>${d.title || '—'}</td>
+              <td>${stageBadge(d.stageId, d.stage)}</td>
+              <td class="amount">${d.amount ? fmt(d.amount) : '—'}</td>
+              <td class="muted">${fmtDate(d.date)}</td>
+            </tr>
+          `).join('')}
+          ${slice.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:30px">Ничего не найдено</td></tr>' : ''}
+        </tbody>
+      </table>
+      <div class="pagination">
+        <span>Показано ${(dealsPage-1)*PAGE_SIZE+1}–${Math.min(dealsPage*PAGE_SIZE,total)} из ${total}</span>
+        <div class="page-btns">
+          <button class="page-btn" onclick="setDealsPage(${dealsPage-1})" ${dealsPage<=1?'disabled':''}>←</button>
+          ${Array.from({length: Math.min(totalPages,7)}, (_,i) => {
+            const p = i + Math.max(1, Math.min(dealsPage-3, totalPages-6));
+            return `<button class="page-btn ${p===dealsPage?'active':''}" onclick="setDealsPage(${p})">${p}</button>`;
+          }).join('')}
+          <button class="page-btn" onclick="setDealsPage(${dealsPage+1})" ${dealsPage>=totalPages?'disabled':''}>→</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function setDealsSearch(v) { dealsSearch = v; dealsPage = 1; renderDeals(); }
+function setStageFilter(v) { dealsStageFilter = v; dealsPage = 1; renderDeals(); }
+function setDealsPage(p) { dealsPage = p; renderDeals(); window.scrollTo(0,0); }
+
+// ── Contacts ─────────────────────────────────────────────────────────────────
+async function loadContacts() {
+  document.getElementById('contacts-content').innerHTML = `
+    <div class="loading-state"><div class="spinner"></div><div class="loading-text">Загружаю контакты…</div></div>`;
+  try {
+    const res = await fetch('/api/contacts');
+    allContacts = await res.json();
+    if (allContacts.error) throw new Error(allContacts.error);
+    renderContacts();
+  } catch (e) {
+    document.getElementById('contacts-content').innerHTML =
+      `<div class="error-box">Ошибка: ${e.message}</div>`;
+  }
+}
+
+function renderContacts() {
+  document.getElementById('contacts-content').innerHTML = `
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Контакты (${allContacts.length})</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Имя</th><th>Должность</th><th>Телефон</th><th>Email</th><th>Дата</th>
+        </tr></thead>
+        <tbody>
+          ${allContacts.map(c => `
+            <tr>
+              <td class="muted">${c.id}</td>
+              <td>${c.name}</td>
+              <td class="muted">${c.post || '—'}</td>
+              <td class="muted">${c.phone || '—'}</td>
+              <td class="muted">${c.email || '—'}</td>
+              <td class="muted">${fmtDate(c.date)}</td>
+            </tr>
+          `).join('')}
+          ${allContacts.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:30px">Контактов не найдено</td></tr>' : ''}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadDashboard();
+</script>
+</body>
+</html>
