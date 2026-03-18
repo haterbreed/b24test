@@ -49,11 +49,15 @@ app.get('/api/summary', async (req, res) => {
     // Stage labels
     const stages = {};
 try {
+ const stages = {};
+try {
   const stagesRes = await axios.get(`${WEBHOOK}/crm.status.list`, {
     params: { filter: { ENTITY_ID: 'DEAL_STAGE' } }
   });
   (stagesRes.data.result || []).forEach(s => {
     stages[s.STATUS_ID] = s.NAME;
+  });
+} catch(e) {}
   });
 } catch(e) {}
 
